@@ -917,7 +917,13 @@ class BaseDataset(torch.utils.data.Dataset):
         for image_key in bucket[image_index : image_index + bucket_batch_size]:
             image_info = self.image_data[image_key]
             subset = self.image_to_subset[image_key]
-            loss_weights.append(self.prior_loss_weight if image_info.is_reg else 1.0)
+            #loss_weights.append(self.prior_loss_weight if image_info.is_reg else 1.0)
+            if image_info.is_reg:
+                loss_weights.append(self.prior_loss_weight)
+            elif image_info.loss_weight:
+                loss_weights.append(image_info.loss_weight)
+            else:
+                loss_weights.append(1.)
 
             # image/latentsを処理する
             if image_info.latents is not None:  # cache_latents=Trueの場合
@@ -1266,6 +1272,7 @@ class FineTuningDataset(BaseDataset):
 
                 image_info = ImageInfo(image_key, subset.num_repeats, caption, False, abs_path)
                 image_info.image_size = img_md.get("train_resolution")
+                image_info.loss_weight = img_md.get("loss_weight")
 
                 if not subset.color_aug and not subset.random_crop:
                     # if npz exists, use them

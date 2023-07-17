@@ -338,19 +338,19 @@ def train(args):
                 else:
                     target = noise
 
-                if args.min_snr_gamma or args.scale_v_pred_loss_like_noise_pred:
-                    # do not mean over batch dimension for snr weight or scale v-pred loss
-                    loss = torch.nn.functional.mse_loss(noise_pred.float(), target.float(), reduction="none")
-                    loss = loss.mean([1, 2, 3])
+                # do not mean over batch dimension for snr weight or scale v-pred loss
+                loss = torch.nn.functional.mse_loss(noise_pred.float(), target.float(), reduction="none")
+                loss = loss.mean([1, 2, 3])
 
-                    if args.min_snr_gamma:
-                        loss = apply_snr_weight(loss, timesteps, noise_scheduler, args.min_snr_gamma)
-                    if args.scale_v_pred_loss_like_noise_pred:
-                        loss = scale_v_prediction_loss_like_noise_prediction(loss, timesteps, noise_scheduler)
+                loss_weights = batch["loss_weights"]  # 各sampleごとのweight
+                loss = loss * loss_weights
 
-                    loss = loss.mean()  # mean over batch dimension
-                else:
-                    loss = torch.nn.functional.mse_loss(noise_pred.float(), target.float(), reduction="mean")
+                if args.min_snr_gamma:
+                    loss = apply_snr_weight(loss, timesteps, noise_scheduler, args.min_snr_gamma)
+                if args.scale_v_pred_loss_like_noise_pred:
+                    loss = scale_v_prediction_loss_like_noise_prediction(loss, timesteps, noise_scheduler)
+
+                loss = loss.mean()  # mean over batch dimension
 
                 accelerator.backward(loss)
                 if accelerator.sync_gradients and args.max_grad_norm != 0.0:
